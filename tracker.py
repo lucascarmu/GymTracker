@@ -1,9 +1,9 @@
 import cv2
-from predict import detect_objects
+from detect_barbell import detect_objects
 
 tracker = cv2.TrackerKCF_create()
 
-data_output_path = "outputs/"
+data_output_path = "outputs/tracker/"
 data_video_path = "evaluation/evaluation_data/videos/"
 video_n = "video_3"
 video = cv2.VideoCapture(f"{data_video_path}{video_n}.mp4")
