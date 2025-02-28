@@ -1,5 +1,5 @@
 myenv
-evaluation/evaluation_data/outputs/*
-outputs/*
-__pycache__/*
-images/*
+__pycache__
+.ipynb_checkpoints
+data/input/*
+data/output/*
