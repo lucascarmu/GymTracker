@@ -8,6 +8,12 @@ import os
 import ffmpeg
 from scipy.signal import find_peaks, find_peaks
 from scipy.ndimage import uniform_filter1d
+import logging
+
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s - %(message)s",
+                    handlers=[logging.StreamHandler()])
+logger = logging.getLogger(__name__)
 
 def plot_3d_landmarks(results):
     """
@@ -260,7 +266,7 @@ def analize_bbox(video_path, output_path, tracker):
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print(f"Error: No se pudo abrir el video {video_path}")
+        logger.error(f"Error: No se pudo abrir el video {video_path}")
         return
 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -269,7 +275,7 @@ def analize_bbox(video_path, output_path, tracker):
     fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Codec para .avi
 
     if width > height:
-        print("El video está en formato horizontal, se rotará 90° en sentido horario.")
+        logger.info("El video está en formato horizontal, se rotará 90° en sentido horario.")
         width, height = height, width
         rotate = True
     else:
@@ -286,7 +292,7 @@ def analize_bbox(video_path, output_path, tracker):
         initial_frame += 1
         bounding_boxes = detect_objects(source=frame, conf=0.2, line_width=2, classes=0)
         if not ret:
-            print("No se detectaron objetos en el video")
+            logger.warning("No se detectaron objetos en el video.")
             exit()
     bbox = (bounding_boxes[0]["x"], bounding_boxes[0]["y"], bounding_boxes[0]["w"], bounding_boxes[0]["h"])
     tracker.init(frame, bbox)
@@ -320,7 +326,7 @@ def analize_bbox(video_path, output_path, tracker):
     # Borra el archivo .avi 
     os.remove(video_avi)   
 
-    print(f"Video procesado y guardado en {video_mp4}")
+    logger.info(f"Video procesado y guardado en {video_mp4}")
     return frame_numbers, bbox_heights, initial_frame
 
 def find_flat_points(signal, peaks, height=None, distance=None, threshold=0.1, min_distance_from_peak=2):
@@ -428,7 +434,8 @@ def detect_squat_repetitions(bbox_heights, frame_numbers, output_path, size=16,
     #     print(f"  - Inicio: Frame {frame_numbers[start]}")
     #     print(f"  - Pico: Frame {peaks[i]}")
     #     print(f"  - Fin:    Frame {frame_numbers[end]}")
-    
+    logger.info(f"Se detectaron {len(start_frames)} repeticiones de sentadillas.")
+    logger.info(f"Gráfico de repeticiones guardado en {output_path}/rep_squat_graph.png")
     return start_frames, end_frames, peaks
 
 def create_video(video_path, output_path, start_frames,
@@ -446,7 +453,7 @@ def create_video(video_path, output_path, start_frames,
     pose = mp_pose.Pose()
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print(f"Error: No se pudo abrir el video {video_path}")
+        logger.error(f"Error: No se pudo abrir el video {video_path}")  
         return
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -454,7 +461,7 @@ def create_video(video_path, output_path, start_frames,
     fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Codec para .avi
     
     if width > height:
-        print("El video está en formato horizontal, se rotará 90° en sentido horario.")
+        logger.info("El video está en formato horizontal, se rotará 90° en sentido horario.")
         width, height = height, width
         rotate = True
     else:
@@ -528,4 +535,4 @@ def create_video(video_path, output_path, start_frames,
     # Borra el archivo .avi 
     os.remove(video_avi)   
 
-    print(f"Video procesado y guardado en {video_mp4}")
+    logger.info(f"Video procesado y guardado en {video_mp4}")
