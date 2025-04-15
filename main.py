@@ -1,14 +1,12 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 import os
-import cv2
 import logging
-from utils import analize_bbox, detect_squat_repetitions, create_video
+from exercises import process_squat_video, process_deadlift_video
 
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO,  # Nivel de logging (INFO, WARNING, ERROR, DEBUG)
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Formato del mensaje
     handlers=[logging.StreamHandler()]  # Mostrar logs en la consola
 )
 logger = logging.getLogger(__name__)
@@ -22,49 +20,59 @@ PROCESSED_FOLDER = "processed"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
-def process_video(input_path: str, output_path: str):
+@app.post("/process-squat")
+def process_squat(filename: str):
     """
-    Función para procesar un video: analiza las repeticiones de sentadillas y guarda el video procesado.
+    Endpoint para procesar un video de sentadillas.
     """
-    logger.info(f"Procesando video: {input_path}")
+    return process_video_generic(filename, "squat")
 
-    # Inicializar el tracker
-    tracker = cv2.legacy.TrackerBoosting_create()
 
-    # Analizar el bbox y obtener datos
-    logger.info("Analizando bounding box...")
-    frame_numbers, bbox_heights, initial_frame = analize_bbox(
-        video_path=input_path,
-        output_path=output_path,
-        tracker=tracker
-    )
+@app.post("/process-deadlift")
+def process_deadlift(filename: str):
+    """
+    Endpoint para procesar un video de peso muerto.
+    """
+    return process_video_generic(filename, "deadlift")
 
-    # Detectar repeticiones de sentadillas
-    logger.info("Detectando repeticiones de sentadillas...")
-    start_frames, end_frames, peaks = detect_squat_repetitions(
-        bbox_heights=bbox_heights,
-        frame_numbers=frame_numbers,
-        output_path=f"{output_path}{os.path.splitext(os.path.basename(input_path))[0]}"
-    )
 
-    # Crear el video procesado
-    logger.info("Creando video procesado...")
-    create_video(
-        video_path=input_path,
-        output_path=output_path,
-        start_frames=start_frames,
-        end_frames=end_frames,
-        peaks=peaks,
-        sec_pause=3,  # Pausa de 3 segundos en los puntos clave
-        initial_frame=initial_frame
-    )
+def process_video_generic(filename: str, exercise_type: str):
+    """
+    Función genérica para procesar un video según el tipo de ejercicio.
+    """
+    logger.info(f"Procesando video de {exercise_type}: {filename}")
 
-    logger.info(f"Video procesado guardado en: {output_path}")
+    # Ruta completa del archivo subido
+    upload_path = os.path.join(UPLOAD_FOLDER, filename)
+
+    # Verificar que el archivo exista
+    if not os.path.exists(upload_path):
+        logger.error(f"Archivo no encontrado: {filename}")
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    # Ruta completa donde se guardará el archivo procesado
+    processed_path = os.path.join(PROCESSED_FOLDER, exercise_type)
+
+    # Crear la carpeta de salida si no existe
+    os.makedirs(processed_path, exist_ok=True)
+
+    # Procesar el video
+    logger.info(f"Iniciando procesamiento del video para {exercise_type}...")
+    if exercise_type == "squat":
+        process_squat_video(upload_path, processed_path)
+    elif exercise_type == "deadlift":
+        process_deadlift_video(upload_path, processed_path)
+    else:
+        logger.error(f"Tipo de ejercicio no soportado: {exercise_type}")
+        raise HTTPException(status_code=400, detail="Tipo de ejercicio no soportado")
+
+    logger.info(f"Video {filename} procesado exitosamente para {exercise_type}")
+    return {"filename": filename, "exercise": exercise_type, "message": "Video procesado exitosamente"}
 
 @app.post("/upload-video")
 async def upload_video(file: UploadFile = File(...)):
     """
-    Endpoint para subir un archivo de video, procesarlo y guardarlo en la carpeta "processed".
+    Endpoint para subir un archivo de video y guardarlo en la carpeta "uploads".
     """
     logger.info(f"Recibiendo archivo: {file.filename}")
 
@@ -81,15 +89,8 @@ async def upload_video(file: UploadFile = File(...)):
     with open(upload_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    # Ruta completa donde se guardará el archivo procesado
-    processed_path = f"{PROCESSED_FOLDER}/"
-
-    # Procesar el video (analizar repeticiones de sentadillas)
-    logger.info("Iniciando procesamiento del video...")
-    process_video(upload_path, processed_path)
-
-    logger.info(f"Video {file.filename} procesado exitosamente")
-    return {"filename": file.filename, "message": "Video subido y procesado exitosamente"}
+    logger.info(f"Archivo {file.filename} subido exitosamente")
+    return {"filename": file.filename, "message": "Video subido exitosamente"}
 
 @app.get("/get-video")
 async def get_video(video_name: str):
