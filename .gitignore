@@ -1,0 +1,5 @@
+myenv
+__pycache__
+.ipynb_checkpoints
+backend/processed
+backend/uploads
